@@ -1,0 +1,5 @@
+"""
+MedPsy Clinical Trial Matching Agent — Requirements
+"""
+nebius-client>=1.0.0
+openai>=1.0.0
