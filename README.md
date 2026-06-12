@@ -158,7 +158,7 @@ response = client.chat.completions.create(
 ### Quick Start (5 minutes)
 ```bash
 # 1. Clone
-git clone https://github.com/zan-maker/medpsy-clinical-trial-agent
+git clone https://github.com/icohangar-ops/medpsy-clinical-trial-agent
 cd medpsy-clinical-trial-agent
 
 # 2. Set API key
