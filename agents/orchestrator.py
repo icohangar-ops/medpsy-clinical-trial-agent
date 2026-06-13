@@ -240,46 +240,58 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load patient case
-    patient = load_patient_case(args.case) if args.case else load_patient_case("nonexistent")
-    print(f"🧬 MedPsy Clinical Trial Matching Agent")
-    print("=" * 50)
-    print(f"Patient: {patient.get('age')}yo {patient.get('gender')} — {patient.get('diagnosis')}")
-    print()
-
-    # Step 1: Diagnostic analysis
-    print("🔬 Step 1: Diagnostic Analysis...")
-    diagnosis = run_diagnostic_agent(patient)
-    print(f"  Subtype: {diagnosis.get('subtype', 'N/A')}")
-    print(f"  Confidence: {diagnosis.get('confidence', 'N/A')}")
-    print()
-
-    # Step 2: Trial matching
-    print("🔎 Step 2: Trial Matching...")
-    trial_results = run_trial_matcher(patient, diagnosis)
-    print(f"  Tool calls: {len(trial_results.get('tool_calls', []))}")
-    print()
-
-    # Step 3: Synthesize report
-    print("📋 Step 3: Synthesizing Report...")
-    report = synthesize_report(patient, trial_results)
-    print()
-
-    # Output
     try:
-        report_json = json.loads(report)
-        print("✅ Report Generated:")
-        print(json.dumps(report_json, indent=2)[:2000])
-    except json.JSONDecodeError:
-        print("⚠️ Raw Report:")
-        print(report[:2000])
+        # Load patient case
+        patient = load_patient_case(args.case) if args.case else load_patient_case("nonexistent")
+        print(f"🧬 MedPsy Clinical Trial Matching Agent")
+        print("=" * 50)
+        print(f"Patient: {patient.get('age')}yo {patient.get('gender')} — {patient.get('diagnosis')}")
+        print()
 
-    if args.output:
-        with open(args.output, "w") as f:
-            f.write(report)
-        print(f"\n📁 Report saved to: {args.output}")
+        # Step 1: Diagnostic analysis
+        print("🔬 Step 1: Diagnostic Analysis...")
+        diagnosis = run_diagnostic_agent(patient)
+        print(f"  Subtype: {diagnosis.get('subtype', 'N/A')}")
+        print(f"  Confidence: {diagnosis.get('confidence', 'N/A')}")
+        print()
 
-    return report
+        # Step 2: Trial matching
+        print("🔎 Step 2: Trial Matching...")
+        trial_results = run_trial_matcher(patient, diagnosis)
+        print(f"  Tool calls: {len(trial_results.get('tool_calls', []))}")
+        print()
+
+        # Step 3: Synthesize report
+        print("📋 Step 3: Synthesizing Report...")
+        report = synthesize_report(patient, trial_results)
+        print()
+
+        # Output
+        try:
+            report_json = json.loads(report)
+            print("✅ Report Generated:")
+            print(json.dumps(report_json, indent=2)[:2000])
+        except json.JSONDecodeError:
+            print("⚠️ Raw Report:")
+            print(report[:2000])
+
+        if args.output:
+            with open(args.output, "w") as f:
+                f.write(report)
+            print(f"\n📁 Report saved to: {args.output}")
+
+        return report
+
+    except Exception as exc:
+        # Emit a structured error JSON instead of a raw traceback so callers /
+        # downstream tooling can parse the failure deterministically.
+        error_payload = {
+            "status": "error",
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
+        print(json.dumps(error_payload, indent=2), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

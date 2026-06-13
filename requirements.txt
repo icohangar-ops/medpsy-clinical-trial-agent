@@ -3,3 +3,4 @@ MedPsy Clinical Trial Matching Agent — Requirements
 """
 nebius-client>=1.0.0
 openai>=1.0.0
+cubiczan-resilience @ git+https://github.com/icohangar-ops/cubiczan-resilience.git#subdirectory=python

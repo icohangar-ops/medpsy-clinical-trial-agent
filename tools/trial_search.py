@@ -3,9 +3,20 @@ Clinical trial search tool for Nebius function calling.
 Queries ClinicalTrials.gov API v2.
 """
 import json
+import os
 import urllib.request
 import urllib.parse
 from typing import Optional
+
+from cubiczan_resilience import resilient
+
+
+@resilient(timeout=20.0, max_attempts=3)
+def _fetch_trials(url: str) -> dict:
+    """Fetch and parse the ClinicalTrials.gov response (with retry/timeout)."""
+    req = urllib.request.Request(url, headers={"User-Agent": "MedPsyAgent/1.0"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode())
 
 
 def search_clinical_trials(
@@ -48,9 +59,9 @@ def search_clinical_trials(
 
     try:
         url = f"{base_url}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "MedPsyAgent/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode())
+        # Retried + timeout-bounded fetch (cubiczan_resilience). After max_attempts
+        # the underlying exception propagates to the handler below.
+        data = _fetch_trials(url)
 
         study_fields = data.get("StudyFieldsResponse", {}).get("StudyFieldsList", [])
         trials = []
@@ -65,7 +76,27 @@ def search_clinical_trials(
         return json.dumps({"trials": trials, "count": len(trials)}, indent=2)
 
     except Exception as e:
-        # Fallback: return mock data for hackathon demo
+        # The live ClinicalTrials.gov query failed after retries. Returning
+        # fabricated trials as if they were real is unsafe in a clinical
+        # context (audit finding: "silent fallback to fabricated mock data"),
+        # so the synthetic demo dataset is now OPT-IN and explicitly labeled.
+        # Default behaviour surfaces a structured error so callers do not
+        # mistake invented trials for genuine matches.
+        if os.environ.get("MEDPSY_ALLOW_MOCK_TRIALS") != "1":
+            return json.dumps(
+                {
+                    "trials": [],
+                    "count": 0,
+                    "error": str(e),
+                    "note": (
+                        "Live ClinicalTrials.gov lookup failed. Set "
+                        "MEDPSY_ALLOW_MOCK_TRIALS=1 to return synthetic demo data."
+                    ),
+                },
+                indent=2,
+            )
+
+        # Explicitly opted-in synthetic demo data (clearly flagged as not real).
         mock_trials = [
             {
                 "nct_id": "NCT04200196",

@@ -7,6 +7,7 @@ import os
 import json
 from typing import Optional
 from openai import OpenAI
+from cubiczan_resilience import resilient
 
 NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1"
 NEBIUS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
@@ -34,6 +35,7 @@ class NebiusAgent:
         self.system_prompt = system_prompt
         self.client = get_client()
 
+    @resilient(timeout=60.0, max_attempts=3)
     def chat(
         self,
         messages: list,
@@ -77,6 +79,7 @@ class NebiusAgent:
             ]
         return result
 
+    @resilient(timeout=30.0, max_attempts=3)
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed texts using Nebius embedding model."""
         response = self.client.embeddings.create(
