@@ -15,8 +15,9 @@ import os
 import json
 import sys
 
-# Add the project root to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the project root (parent of agents/) to path so nebius_client, tools/,
+# and data_layer resolve whether run as a module or as a script.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from nebius_client import NebiusAgent
 from tools.trial_search import search_clinical_trials, TOOL_DEFINITION as TRIAL_TOOL

@@ -1,0 +1,65 @@
+{
+  "_note": "SYNTHETIC demo data — NOT real ClinicalTrials.gov results. Used by the offline/mock tier. NCT IDs are real public trials chosen for realism, but this fixture must never be presented as a live query result.",
+  "conditions": {
+    "breast cancer": [
+      {
+        "nct_id": "NCT04200196",
+        "title": "A Study of Palbociclib Plus Letrozole in Participants With ER+/HER2- Advanced Breast Cancer",
+        "status": "RECRUITING",
+        "condition": "ER+ HER2- Breast Cancer",
+        "phase": "Phase 3",
+        "eligibility_summary": "ER+/HER2- breast cancer, post-menopausal, ECOG 0-1",
+        "location": "Multiple sites including New York"
+      },
+      {
+        "nct_id": "NCT04949256",
+        "title": "Ribociclib and Letrozole in Advanced ER+/HER2- Breast Cancer",
+        "status": "RECRUITING",
+        "condition": "ER+ HER2- Breast Cancer",
+        "phase": "Phase 2",
+        "eligibility_summary": "ER+/HER2- breast cancer, any menopausal status, ECOG 0-2",
+        "location": "New York, NY"
+      },
+      {
+        "nct_id": "NCT05563376",
+        "title": "Abemaciclib in High-Risk Early Breast Cancer (monarchE)",
+        "status": "ACTIVE",
+        "condition": "ER+ HER2- High-Risk Early Breast Cancer",
+        "phase": "Phase 3",
+        "eligibility_summary": "ER+/HER2- breast cancer, 4+ positive nodes, ECOG 0-1",
+        "location": "Multiple US sites"
+      }
+    ],
+    "prostate cancer": [
+      {
+        "nct_id": "NCT02257736",
+        "title": "Enzalutamide in Metastatic Castration-Resistant Prostate Cancer",
+        "status": "RECRUITING",
+        "condition": "Metastatic Castration-Resistant Prostate Cancer",
+        "phase": "Phase 3",
+        "eligibility_summary": "mCRPC, progressed on prior therapy, ECOG 0-2",
+        "location": "Multiple US sites"
+      },
+      {
+        "nct_id": "NCT03746431",
+        "title": "Olaparib for mCRPC With HRR Gene Alterations",
+        "status": "ACTIVE",
+        "condition": "Metastatic Castration-Resistant Prostate Cancer",
+        "phase": "Phase 3",
+        "eligibility_summary": "mCRPC with HRR mutations, ECOG 0-1",
+        "location": "New York, NY"
+      }
+    ]
+  },
+  "default": [
+    {
+      "nct_id": "NCT00000000",
+      "title": "Synthetic Demo Trial (no condition-specific match)",
+      "status": "RECRUITING",
+      "condition": "Generic Oncology",
+      "phase": "Phase 2",
+      "eligibility_summary": "Adult patients, ECOG 0-2. Synthetic placeholder.",
+      "location": "Demo Site"
+    }
+  ]
+}

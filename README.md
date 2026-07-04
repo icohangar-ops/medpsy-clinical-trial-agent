@@ -176,6 +176,49 @@ python agents/orchestrator.py --interactive
 
 ---
 
+## 🧪 Offline / mock mode
+
+The agent runs the **full pipeline with zero credentials** using the same
+three-tier fallback as the rest of the Cubiczan stack — **live → local cache →
+embedded synthetic mock** — so demos and CI never depend on network access or an
+API key.
+
+```bash
+# Full pipeline offline — no NEBIUS_API_KEY, no network:
+MEDPSY_OFFLINE=1 MEDPSY_MOCK=1 python agents/orchestrator.py
+
+# Run the offline test suite (no credentials required):
+pip install pytest
+pytest -q
+```
+
+**What each tier serves**
+
+| Layer | Live tier | Cache tier | Mock tier |
+|-------|-----------|------------|-----------|
+| Clinical trials (`tools/trial_search.py`) | ClinicalTrials.gov | last successful query (6h TTL) | `fixtures/synthetic_trials.json` |
+| LLM reasoning (`nebius_client.py`) | Nebius Token Factory | — | deterministic `mock_llm.py` completions |
+| EHR (`tools/ehr_lookup.py`) | Epic/Cerner FHIR (prod) | — | built-in demo patients |
+
+**How mock mode is triggered** (any of):
+
+| Env var | Effect |
+|---------|--------|
+| `MEDPSY_OFFLINE=1` | Fully offline: no network; LLM served from `mock_llm`; synthetic trials enabled |
+| `MEDPSY_MOCK=1` | LLM served from mock tier; synthetic trials enabled |
+| *(unset)* `NEBIUS_API_KEY` | Auto-detected → LLM falls back to the mock tier |
+| `MEDPSY_ALLOW_MOCK_TRIALS=1` | Allow synthetic trials as a fallback when a **live** query fails |
+
+**Clinical-safety note.** Synthetic trial data is always **opt-in** and clearly
+labeled (`source: "synthetic"`, plus a `note`). When a live query fails and no
+opt-in flag is set, the tool returns a structured empty result rather than
+fabricated trials — so invented trials can never be mistaken for real matches.
+
+The optional `cubiczan-resilience` and `openai` packages are imported lazily:
+their absence does not break offline runs or the test suite.
+
+---
+
 ## 📥 Sample Input & Output
 
 ### Input

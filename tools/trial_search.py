@@ -4,11 +4,32 @@ Queries ClinicalTrials.gov API v2.
 """
 import json
 import os
+import sys
 import urllib.request
 import urllib.parse
 from typing import Optional
 
-from cubiczan_resilience import resilient
+try:
+    from cubiczan_resilience import resilient
+except Exception:  # pragma: no cover - git dep may be absent offline/CI
+    def resilient(*_args, **_kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+
+        if _args and callable(_args[0]) and not _kwargs:
+            return _args[0]
+        return _decorator
+
+# Make the repo root importable so the shared data layer resolves whether this
+# tool is imported as ``tools.trial_search`` or run directly.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from data_layer import (  # noqa: E402
+    mock_trials_allowed,
+    offline_mode,
+    read_cache,
+    synthetic_trials,
+    write_cache,
+)
 
 
 @resilient(timeout=20.0, max_attempts=3)
@@ -57,10 +78,44 @@ def search_clinical_trials(
         "fmt": "json",
     }
 
+    cache_key = f"trials::{condition}::{location}::{max_results}"
+
+    def _synthetic(reason: str) -> str:
+        """Tier 3: opt-in, clearly-labeled synthetic trials from the fixture."""
+        trials = synthetic_trials(condition, max_results)
+        return json.dumps(
+            {
+                "trials": trials,
+                "count": len(trials),
+                "source": "synthetic",
+                "note": (
+                    "SYNTHETIC demo data — not a live ClinicalTrials.gov result. "
+                    f"Reason: {reason}."
+                ),
+            },
+            indent=2,
+        )
+
+    # ── Tier 0: fully offline — never touch the network. Synthetic is opt-in. ──
+    if offline_mode():
+        if mock_trials_allowed():
+            return _synthetic("offline mode")
+        return json.dumps(
+            {
+                "trials": [],
+                "count": 0,
+                "note": (
+                    "Offline mode with synthetic trials disabled. Set "
+                    "MEDPSY_MOCK=1 (or MEDPSY_ALLOW_MOCK_TRIALS=1) to enable "
+                    "synthetic demo data."
+                ),
+            },
+            indent=2,
+        )
+
+    # ── Tier 1: live ClinicalTrials.gov (retried + timeout-bounded). ──────────
     try:
         url = f"{base_url}?{urllib.parse.urlencode(params)}"
-        # Retried + timeout-bounded fetch (cubiczan_resilience). After max_attempts
-        # the underlying exception propagates to the handler below.
         data = _fetch_trials(url)
 
         study_fields = data.get("StudyFieldsResponse", {}).get("StudyFieldsList", [])
@@ -73,60 +128,36 @@ def search_clinical_trials(
                 "condition": (study.get("Condition") or [""])[0],
             })
 
-        return json.dumps({"trials": trials, "count": len(trials)}, indent=2)
+        result = json.dumps(
+            {"trials": trials, "count": len(trials), "source": "live"}, indent=2
+        )
+        write_cache(cache_key, result)  # populate the cache tier on success
+        return result
 
     except Exception as e:
-        # The live ClinicalTrials.gov query failed after retries. Returning
-        # fabricated trials as if they were real is unsafe in a clinical
-        # context (audit finding: "silent fallback to fabricated mock data"),
-        # so the synthetic demo dataset is now OPT-IN and explicitly labeled.
-        # Default behaviour surfaces a structured error so callers do not
-        # mistake invented trials for genuine matches.
-        if os.environ.get("MEDPSY_ALLOW_MOCK_TRIALS") != "1":
+        # ── Tier 2: local cache from a prior successful live query. ───────────
+        cached = read_cache(cache_key)
+        if cached is not None:
+            return cached
+
+        # ── Tier 3: synthetic — OPT-IN only. Fabricated trials are unsafe in a
+        # clinical context (audit finding: "silent fallback to fabricated mock
+        # data"), so default behaviour surfaces a structured error instead. ──
+        if not mock_trials_allowed():
             return json.dumps(
                 {
                     "trials": [],
                     "count": 0,
                     "error": str(e),
                     "note": (
-                        "Live ClinicalTrials.gov lookup failed. Set "
-                        "MEDPSY_ALLOW_MOCK_TRIALS=1 to return synthetic demo data."
+                        "Live ClinicalTrials.gov lookup failed and no cache is "
+                        "available. Set MEDPSY_ALLOW_MOCK_TRIALS=1 (or "
+                        "MEDPSY_MOCK=1) to return synthetic demo data."
                     ),
                 },
                 indent=2,
             )
-
-        # Explicitly opted-in synthetic demo data (clearly flagged as not real).
-        mock_trials = [
-            {
-                "nct_id": "NCT04200196",
-                "title": "A Study of Ibrance (Palbociclib) Plus Letrozole in Chinese Participants With ER+/HER2- Advanced Breast Cancer",
-                "status": "RECRUITING",
-                "condition": "ER+ HER2- Breast Cancer",
-                "phase": "Phase 3",
-                "eligibility_summary": "ER+/HER2- breast cancer, post-menopausal, ECOG 0-1",
-                "location": "Multiple sites including New York",
-            },
-            {
-                "nct_id": "NCT04949256",
-                "title": "Ribociclib and Letrozole in Advanced ER+/HER2- Breast Cancer",
-                "status": "RECRUITING",
-                "condition": "ER+ HER2- Breast Cancer",
-                "phase": "Phase 2",
-                "eligibility_summary": "ER+/HER2- breast cancer, any menopausal status, ECOG 0-2",
-                "location": "New York, NY",
-            },
-            {
-                "nct_id": "NCT05563376",
-                "title": "Abemaciclib in High-Risk Early Breast Cancer (monarchE)",
-                "status": "ACTIVE",
-                "condition": "ER+ HER2- High-Risk Early Breast Cancer",
-                "phase": "Phase 3",
-                "eligibility_summary": "ER+/HER2- breast cancer, 4+ positive nodes, ECOG 0-1",
-                "location": "Multiple US sites",
-            },
-        ]
-        return json.dumps({"trials": mock_trials, "count": len(mock_trials), "source": "mock", "error": str(e)}, indent=2)
+        return _synthetic(f"live lookup failed: {e}")
 
 
 TOOL_DEFINITION = {
